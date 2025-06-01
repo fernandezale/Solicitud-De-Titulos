@@ -44,31 +44,22 @@ if (!empty($dni)) {
     $stmt->close();
 }
 
-// Paso 5-6: El egresado selecciona aceptar y se genera la solicitud
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generar_solicitud'])) {
     // Verificar que el egresado esté habilitado para solicitar
     $habilitado = true;
     $razon_no_habilitado = "";
-    
+
     // Verificar requisitos básicos (implementar lógica según tus reglas)
     if ($datos_egresado) {
-        if (!isset($datos_egresado['creditos_totales']) || $datos_egresado['creditos_totales'] < 400) {
+        if (!isset($datos_egresado['creditos_totales']) || $datos_egresado['creditos_totales'] < 50) {
             $habilitado = false;
             $razon_no_habilitado .= "- No cumple con los créditos mínimos requeridos.<br>";
         }
-        
         if (!isset($datos_egresado['promedio']) || $datos_egresado['promedio'] < 7.0) {
             $habilitado = false;
             $razon_no_habilitado .= "- No cumple con el promedio mínimo requerido.<br>";
         }
-        
-        if (!isset($datos_egresado['servicio_social']) || $datos_egresado['servicio_social'] != 1) {
-            $habilitado = false;
-            $razon_no_habilitado .= "- No ha completado el servicio social.<br>";
-        }
-        
-        // Verificar adeudo bibliográfico (paso 13)
-        if (!isset($datos_egresado['adeudos']) || $datos_egresado['adeudos'] == 1) {
+        if (!isset($datos_egresado['adeudos']) || $datos_egresado['adeudos'] == 'si') {
             $habilitado = false;
             $razon_no_habilitado .= "- Tiene adeudos de material bibliográfico.<br>";
         }
@@ -76,28 +67,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generar_solicitud'])) 
         $habilitado = false;
         $razon_no_habilitado = "No se encontraron datos del egresado.";
     }
-    
+
     if ($habilitado) {
-        // Generar identificador único para la solicitud
-        $identificador = "SOL-".time()."-".rand(1000, 9999);
+        // Generar identificador numérico único para la solicitud
+        $identificador = time() . rand(1000, 9999); // Ejemplo: 17200000001234
         $fecha_actual = date('Y-m-d H:i:s');
+        $tipo_solicitud = "Título de Grado";
         $estado = "iniciada";
-        
+        $comentarios = "Solicitud generada por el egresado con DNI: $dni";
+
         // Insertar la solicitud en la base de datos
-        $stmt = $conn->prepare("INSERT INTO solicitudes (estudiante_id, fecha_solicitud, estado, comentarios) 
-                               VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("isss", $usuario_id, $fecha_actual, $estado, $identificador);
-        
-        if ($stmt->execute()) {
+        $stmt = $conn->prepare("INSERT INTO solicitudes (estudiante_id, fecha_solicitud, tipo_solicitud, estado, identificador, comentarios) 
+                               VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("isssss", $usuario_id, $fecha_actual, $tipo_solicitud, $estado, $identificador, $comentarios);
+
+        if ($stmt->execute())
+        {
             $solicitud_id = $conn->insert_id;
             $mensaje = "Solicitud generada exitosamente. Identificador: $identificador";
-            
+
             // Redireccionar a la siguiente pantalla
             $_SESSION['solicitud_id'] = $solicitud_id;
             $_SESSION['solicitud_identificador'] = $identificador;
-            header("Location: expedicion_titulo.php");
-            exit();
-        } else {
+            
+        } 
+        else
+        {
             $mensaje = "Error al generar la solicitud: " . $stmt->error;
         }
         $stmt->close();
@@ -159,16 +154,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generar_solicitud'])) 
                         <td><?php echo isset($datos_egresado['promedio']) ? $datos_egresado['promedio'] : 'No registrado'; ?></td>
                     </tr>
                     <tr>
-                        <th>Servicio Social:</th>
-                        <td><?php echo isset($datos_egresado['servicio_social']) && $datos_egresado['servicio_social'] == 1 ? 'Completado' : 'Pendiente'; ?></td>
+                        <th>Obra Social:</th>
+                        <td><?php echo htmlspecialchars($datos_egresado['servicio_social']); ?></td>
                     </tr>
                     <tr>
                         <th>Prácticas Profesionales:</th>
-                        <td><?php echo isset($datos_egresado['practicas_profesionales']) && $datos_egresado['practicas_profesionales'] == 1 ? 'Completado' : 'Pendiente'; ?></td>
+                        <td><?php echo htmlspecialchars($datos_egresado['practicas_profesionales']); ?></td>
                     </tr>
                     <tr>
                         <th>Adeudos:</th>
-                        <td><?php echo isset($datos_egresado['adeudos']) && $datos_egresado['adeudos'] == 0 ? 'Sin adeudos' : 'Con adeudos'; ?></td>
+                        <td><?php echo htmlspecialchars($datos_egresado['adeudos']); ?></td>
                     </tr>
                 </table>
                 
@@ -179,7 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generar_solicitud'])) 
                     </div>
                     
                     <input type="hidden" name="dni" value="<?php echo htmlspecialchars($dni); ?>">
-                    <button type="submit" name="generar_solicitud" class="btn">Generar Solicitud de Título</button>
+                    <button type="submit" name="generar_solicitud" class="btn">Generar Solicitud de Título de Grado</button>
                 </form>
             </div>
         <?php endif; ?>
